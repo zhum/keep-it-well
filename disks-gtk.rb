@@ -1,5 +1,6 @@
 #!/usr/bin/env ruby
-
+# frozen_string_literal: true
+#
 require 'gtk2'
 require 'yaml'
 
@@ -53,21 +54,6 @@ def do_search(tree, model, text)
    ret
 end
 
-# def add_node(tree, model )
-#    select = tree.selection
-#    if iter = select.selected
-#       iter2 = model.append( iter )
-#       iter2.set_value(0, "This is inserted data.")
-#    end
-# end
-
-# def del_node(tree, model )
-#    select = tree.selection
-#    if iter = select.selected
-#       model.remove( iter )
-#    end
-# end
-
 def get_depth( tree, model )
    select = tree.selection
    if iter = select.selected
@@ -77,14 +63,14 @@ end
 
 def get_data(tree, model)
    select = tree.selection
-   data=[nil,nil]
+   data=nil
    if iter = select.selected
-      data[0] = model.get_value(iter, 0)
-      data[1] = model.get_value(iter, 1)
+      data = model.get_value(iter, 0)
+      #data[1] = model.get_value(iter, 1)
    end
 
    if data != nil
-      @label.set_text( "Data Value: #{data[1]}" )
+      @label.set_text( "Data Value: #{data}" )
    else
       @label.set_text( '' )
    end
@@ -99,8 +85,10 @@ def add_tree(root, model, part, path)
       el.each_key do |kk|
         val=model.append(root)
         val.set_value(0,kk)
-        # TODO: replace by description
-        val.set_value(1,$descr[kk] || '')
+        d = $descr[kk] || {}
+        val.set_value(1,d['rate'].to_s || '-')
+        val.set_value(2,d['genre'] || '-')
+        val.set_value(3,d['descr'] || '')
         #val.set_value(2,"#{path}/#{kk}")
         add_tree(val, model, el[kk],"#{path}/#{kk}")
       end
@@ -112,8 +100,10 @@ def add_tree(root, model, part, path)
   list.each do |li|
     val=model.append(root)
     val.set_value(0,li)
-    #warn "-- '#{li}' / '#{$descr[li]}' (#{$descr})"
-    val.set_value(1,$descr[li] || '--')
+    d = $descr[li] || {}
+    val.set_value(1,d['rate'].to_s || '-')
+    val.set_value(2,d['genre'] || '-')
+    val.set_value(3,d['descr'] || '--')
     #val.set_value(1,"qwe")
     #val.set_value(2,"#{path}/#{li}")
   end
@@ -129,7 +119,11 @@ def load_yaml(tree, model)
   elsif File.file? ARGV[0]
     ARGV
   else
-    descr_dir = ARGV[0].capitalize
+    if ARGV[0].include? '/'
+      descr_dir = ARGV[0]
+    else
+      descr_dir = ARGV[0].capitalize
+    end
     $descr_path = "#{descr_dir}/descr.yml"
     Dir.glob("#{descr_dir}/*.yml").reject{|x| x == $descr_path}
   end
@@ -144,7 +138,10 @@ def load_yaml(tree, model)
     yaml.each{ |k,v|
       val=model.append(root)
       val.set_value(0,k)
-      val.set_value(1,$descr[k] || '+')
+      d = $descr[k] || {}
+      val.set_value(1,d['rate'].to_s || '-')
+      val.set_value(2,d['genre'] || '-')
+      val.set_value(3,d['descr'] || '+')
       #val.set_value(1,"Root/#{k}")
       #warn "++ #{val}, #{model}, #{k}/#{v}"
       add_tree(val,model,yaml[k],"Root/#{k}")
@@ -189,8 +186,8 @@ scroller.set_policy( Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC )
 @window.add( vbox2 )
 vbox2.pack_start( scroller, true, true, 0 )
 
-# Create the TreeStore with three columns
-model = Gtk::TreeStore.new( String, String, String)
+# Create the TreeStore with columns
+model = Gtk::TreeStore.new(String, String, String, String, String)
 
 # Create the TreeView adding the TreeStore
 tree = Gtk::TreeView.new( model )
@@ -212,29 +209,72 @@ render.set_property( "background", "black" )
 render.set_property( "foreground", "white" )
 
 # Create the editable renderer and set properties
-edit_render = Gtk::CellRendererText.new
-edit_render.set_property( "background", "black" )
-edit_render.set_property( "foreground", "white" )
-edit_render.editable = true
-edit_render.signal_connect('edited') do |renderer, val, var|
+edit_render1 = Gtk::CellRendererText.new
+edit_render1.set_property( "background", "black" )
+edit_render1.set_property( "foreground", "white" )
+edit_render1.editable = true
+edit_render1.signal_connect('edited') do |renderer, val, var|
   # use Treeview#selection#selected to modify the
   # model. var contains the new text.
-  #warn "#{renderer.class}/#{val.class}/#{var.class} = #{renderer}/#{val}/#{var} "
+  #warn "#{renderer.class}/#{val.class}/#{var.class} = #{renderer}/#{val}/#{var}"
   iter = model.get_iter(val)
-  iter.set_value(1,var)
-  $descr[iter[0]] = var
-  save_descr
+  warn "1 #{iter[0]}: #{iter[1]},#{iter[2]},#{iter[3]}"
+  iter[1] = var
+  #$descr[iter[0]] = var
+  #save_descr
+  get_data(tree, model)
+end
+
+# Create the editable renderer and set properties
+edit_render2 = Gtk::CellRendererText.new
+edit_render2.set_property( "background", "black" )
+edit_render2.set_property( "foreground", "white" )
+edit_render2.editable = true
+edit_render2.signal_connect('edited') do |renderer, val, var|
+  # use Treeview#selection#selected to modify the
+  # model. var contains the new text.
+  #warn "#{renderer.class}/#{val.class}/#{var.class} = #{renderer}/#{val}/#{var}"
+  iter = model.get_iter(val)
+  warn "2 #{iter[0]}: #{iter[1]},#{iter[2]},#{iter[3]}"
+  iter[2] = var
+  #$descr[iter[0]] = var
+  #save_descr
+  get_data(tree, model)
+end
+
+# Create the editable renderer and set properties
+edit_render3 = Gtk::CellRendererText.new
+edit_render3.set_property( "background", "black" )
+edit_render3.set_property( "foreground", "white" )
+edit_render3.editable = true
+edit_render3.signal_connect('edited') do |renderer, val, var|
+  # use Treeview#selection#selected to modify the
+  # model. var contains the new text.
+  #warn "#{renderer.class}/#{val.class}/#{var.class} = #{renderer}/#{val}/#{var}"
+  iter = model.get_iter(val)
+  warn "3 #{iter[0]}: #{iter[1]},#{iter[2]},#{iter[3]}"
+  iter[3] = var
+  warn "3 #{iter[0]}: #{iter[1]},#{iter[2]},#{iter[3]}"
+  #$descr[iter[0]] = var
+  #save_descr
   get_data(tree, model)
 end
 
 # Create the columns
 c1 = Gtk::TreeViewColumn.new( "Title", render, {:text => 0} )
-c2 = Gtk::TreeViewColumn.new( "Descr", edit_render, {:text => 1} )
 c1.resizable = true
+c1.max_width = 300
+c2 = Gtk::TreeViewColumn.new( "Rate", edit_render1, {:text => 1} )
 c2.resizable = true
+c3 = Gtk::TreeViewColumn.new( "Genre", edit_render2, {:text => 1} )
+c3.resizable = true
+c4 = Gtk::TreeViewColumn.new( "Descr", edit_render3, {:text => 1} )
+c4.resizable = true
 # append the columns to treeview
 tree.append_column( c1 )
 tree.append_column( c2 )
+tree.append_column( c3 )
+tree.append_column( c4 )
 
 # add the treeview to the scroller
 scroller.add( tree )
@@ -248,8 +288,6 @@ frame = Gtk::Frame.new( "Actions" )
 vbox = Gtk::VBox.new( false, 0 )
 frame.add( vbox )
 vbox2.pack_start( frame, false, false, 0 )
-
-#last_search="0"
 
    hbox = Gtk::HBox.new( true, 0 )
    text = Gtk::Entry.new
@@ -270,6 +308,47 @@ vbox2.pack_start( frame, false, false, 0 )
    button.signal_connect( "clicked" ) { tree.collapse_all }
    hbox.pack_start( button, true, true, 0 )
    vbox.pack_start( hbox, false, false, 0 )
+
+   ## 4th row
+   hbox = Gtk::HBox.new( true, 0 )
+   button = Gtk::Button.new( "Get Data" )
+   button.signal_connect( "clicked" ) {get_data(tree, model)}
+   hbox.pack_start( button, true, true, 0 )
+
+   button = Gtk::Button.new( "Get Iter Depth" )
+   button.signal_connect( "clicked" ) {get_depth(tree, model)}
+   hbox.pack_start( button, true, true, 0 )
+   vbox.pack_start( hbox, false, false, 0 )
+
+   hbox = Gtk::HBox.new( true, 0 )
+   @label = Gtk::Label.new("")
+   hbox.pack_start( @label, true, true, 0 )
+   vbox.pack_start( hbox, false, false, 0 )
+
+
+# tree.signal_connect("select-cursor-row"){warn "sel"; get_data(tree,model)}
+tree.signal_connect("cursor-changed"){|t| get_data(t,model)}
+
+@window.show_all
+Gtk.main
+
+
+# def add_node(tree, model )
+#    select = tree.selection
+#    if iter = select.selected
+#       iter2 = model.append( iter )
+#       iter2.set_value(0, "This is inserted data.")
+#    end
+# end
+
+# def del_node(tree, model )
+#    select = tree.selection
+#    if iter = select.selected
+#       model.remove( iter )
+#    end
+# end
+
+
 
    ## 2nd row
    # hbox = Gtk::HBox.new( true, 0 )
@@ -294,25 +373,3 @@ vbox2.pack_start( frame, false, false, 0 )
    # hbox.pack_start( button, true, true, 0 )
    # vbox.pack_start( hbox, false, false, 0 )
 
-   ## 4th row
-   hbox = Gtk::HBox.new( true, 0 )
-   button = Gtk::Button.new( "Get Data" )
-   button.signal_connect( "clicked" ) {get_data(tree, model)}
-   hbox.pack_start( button, true, true, 0 )
-
-   button = Gtk::Button.new( "Get Iter Depth" )
-   button.signal_connect( "clicked" ) {get_depth(tree, model)}
-   hbox.pack_start( button, true, true, 0 )
-   vbox.pack_start( hbox, false, false, 0 )
-
-   hbox = Gtk::HBox.new( true, 0 )
-   @label = Gtk::Label.new("")
-   hbox.pack_start( @label, true, true, 0 )
-   vbox.pack_start( hbox, false, false, 0 )
-
-
-# tree.signal_connect("select-cursor-row"){warn "sel"; get_data(tree,model)}
-tree.signal_connect("cursor-changed"){|t| get_data(t,model)}
-
-@window.show_all
-Gtk.main
