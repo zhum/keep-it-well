@@ -41,7 +41,7 @@ class DiskView < Gtk::Window
       end
     end
 
-    @completion = create_completion_model
+    @completion = create_completion_model(descr)
 
     vbox = Gtk::Box.new(:vertical)
     add(vbox)
@@ -98,14 +98,50 @@ class DiskView < Gtk::Window
 
   end
 
-  def create_completion_model
+  # def extract_genres(descr)
+  #   if descr.is_a?(Array)
+  #     descr.map {|e| extract_genres(e)}
+  #   elsif descr.is_a?(Hash)
+  #     warn "+> #{descr.inspect}"
+  #     descr.values.map{ |e| extract_genres(e)}
+  #   else
+  #     warn "-> #{descr}"
+  #     [descr['genre']]
+  #   end
+  # end
+
+  def completion_check_update(word)
+    return if @completion_words.include?(word) || word.empty?
+    @completion_words << word
+    @completion_words.sort
+    completion_update_model(@completion_words)  
+  end
+
+  def completion_update_model(words)
+    store = Gtk::ListStore.new(String)
+    @completion_words = words
+    words.each do |word|
+      iter = store.append
+      iter[0] = word
+    end
+    @completion.model = store
+  end
+
+  def create_completion_model(descr)
     store = Gtk::ListStore.new(String)
 
-    %w(Фэнтези Детектив История Фантастика Научпоп).each do |word|
+    # arr = extract_genres(descr)
+    arr = descr.values.map { |e| e['genre'] }
+    .concat %w(Фэнтези Детектив История Фантастика Научпоп Деловые Саморазвитие)
+    .flatten
+    .reject { |e| e.nil? || e.empty? }
+    arr = arr.uniq.sort
+    arr.each do |word|
       iter = store.append
       iter[0] = word
     end
 
+    @completion_words = arr
     completion = Gtk::EntryCompletion.new
     # Create a tree model and use it as the completion model
     completion.model = store
@@ -213,6 +249,7 @@ class DiskView < Gtk::Window
       d = @descr[iter.get_value(0)] ||= {'rate' => '', 'genre' => '', 'descr' => ''}
       d['rate'] = new_text.to_i
       save_descr
+      completion_check_update(new_text)
     end      
     append_column(@model, tree_view, "Genre") do |cell, path_string, new_text, model|
       # cell_edited(cell, path_string, new_text, model)
