@@ -4,23 +4,20 @@
 require 'gtk3'
 require 'yaml'
 
-$descr = {}
-$descr_path = nil
-
-class DiskItem
-  attr :title, :rate, :genre, :descr
-  def initialize(t,r,g,d)
-    @title = t
-    @rate = r
-    @genre = g
-    @descr = d
-  end
-end
-
+##
+## @brief      Show and edit collections with descriptions
+##
 class DiskView < Gtk::Window
   TITLE_COLUMN, RATE_COLUMN, GENRE_COLUMN, DESCR_COLUMN = 0, 1, 2, 3
   ISANUMBER = Regexp.new '[0-9]+'
 
+  ##
+  ## @brief      contructor
+  ##
+  ## @param      yaml        collection hash
+  ## @param      descr       description hash ('item' => {rate: n, genre: 'genre', 'descr': 'description'})
+  ## @param      descr_path  path to the description file
+  ##
   def initialize(yaml, descr, descr_path)
     super()
 
@@ -86,8 +83,8 @@ class DiskView < Gtk::Window
     button.signal_connect( "clicked" ) {get_data(tree, @model)}
     hbox.pack_start( button,  :expand => true, :fill => true, :padding => 0 )
 
-    button = Gtk::Button.new(label:  "Get Iter Depth" )
-    button.signal_connect( "clicked" ) {get_depth(tree, @model)}
+    button = Gtk::Button.new(label:  "Quit" )
+    button.signal_connect( "clicked" ) {Gtk.main_quit}
     hbox.pack_start( button,  :expand => true, :fill => true, :padding => 0 )
     vbox2.pack_start( hbox,  :expand => true, :fill => true, :padding => 0 )
 
@@ -110,6 +107,11 @@ class DiskView < Gtk::Window
   #   end
   # end
 
+  ##
+  ## @brief      Add new word to genres autocompletion list
+  ##
+  ## @param      word  new word to add
+  ##
   def completion_check_update(word)
     return if @completion_words.include?(word) || word.empty?
     @completion_words << word
@@ -117,16 +119,26 @@ class DiskView < Gtk::Window
     completion_update_model(@completion_words)  
   end
 
+  ##
+  ## @brief      Replace genres autocompletion list
+  ##
+  ## @param      words  New list of words
+  ##
   def completion_update_model(words)
     store = Gtk::ListStore.new(String)
     @completion_words = words
     words.each do |word|
       iter = store.append
-      iter[0] = word
+      iter[0] = word.to_s
     end
     @completion.model = store
   end
 
+  ##
+  ## @brief      Creates a completion model.
+  ##
+  ## @param      descr  The descriptions hash
+  ##
   def create_completion_model(descr)
     store = Gtk::ListStore.new(String)
 
@@ -151,6 +163,14 @@ class DiskView < Gtk::Window
     completion
   end
 
+  ##
+  ## @brief      Fills the model with data recursively
+  ##
+  ## @param      model   The model
+  ## @param      descr   The descriptions hash
+  ## @param      source  The element to add
+  ## @param      parent  The parent to add to
+  ##
   def append_children(model, descr, source, parent = nil)
     case source
     when Array
@@ -161,6 +181,11 @@ class DiskView < Gtk::Window
       source.each_pair do |k,v|
         iter = model.append(parent)
         iter.set_value(0,k)
+        d = descr[k] || {'rate' => '', 'genre' => '', 'descr' => ''}
+        iter.set_value(0,k)
+        iter.set_value(1,d['rate'].to_s=='0' ? '' : d['rate'].to_s)
+        iter.set_value(2,d['genre'].to_s)
+        iter.set_value(3,d['descr'].to_s)
         append_children(model, descr, v, iter)
       end
     when String
@@ -176,25 +201,31 @@ class DiskView < Gtk::Window
     end
   end
 
+  ##
+  ## @brief      Appends a new column.
+  ##
+  ## @param      model      The model
+  ## @param      tree_view  The tree_view object
+  ## @param      title      The column title
+  ## @param      min_width  The minimum column width [100]
+  ## @param      block      The code block to execute on editing finish
+  ##
   def append_column(model, tree_view, title, min_width = 100, &block)
     renderer = Gtk::CellRendererText.new
-    #warn "-- #{renderer.methods.sort.join("; ")}"
     renderer.editable = true
     renderer.signal_connect('edited') do |*args|
-      # warn "args=#{args.inspect}"
       block.call(*args.push(model))
     end
-    renderer.signal_connect('editing-started') do |*args|
-      (renderer, editable, path) = args
-      warn "Start! #{renderer.inspect}\n#{editable.inspect}"
-      editable.set_completion(@completion)
-      @path = path # save the path for later usage
+    if title=='Genre'
+      renderer.signal_connect('editing-started') do |*args|
+        (renderer_auto, editable, path) = args
+        # warn "Start! #{renderer_auto.inspect}\n#{editable.inspect}"
+        editable.set_completion(@completion)
+      end
     end
-    # renderer_text.connect('edited', self.text_edited)    # warn "tree_view: #{tree_view.columns}"
     index = tree_view.insert_column(-1, title, renderer,
                            {
-                             :text => tree_view.columns.size,
-                             # :editable => COLUMN_EDITABLE,
+                             :text => tree_view.columns.size
                            })
     eval "def renderer.column; #{index-1}; end"
     col = tree_view.get_column(index-1)
@@ -204,17 +235,12 @@ class DiskView < Gtk::Window
     col.expand = true
   end
 
-  def cell_edited(cell, path_string, new_text, model)
-    path = Gtk::TreePath.new(path_string)
-
-    column = cell.column
-
-    iter = model.get_iter(path)
-    warn "edited: #{column}, #{iter.path}, #{path_string}, #{new_text}"
-    iter.set_value(column,new_text)
-    warn iter.get_value(0)
-  end
-
+  ##
+  ## @brief      Creates a tree.
+  ##
+  ## @param      yml    The collection hash
+  ## @param      descr  The descriptions hash
+  ##
   def create_tree(yml, descr)
     @model = Gtk::TreeStore.new(String, String, String, String)
     tree_view = Gtk::TreeView.new
@@ -229,57 +255,44 @@ class DiskView < Gtk::Window
 
     append_children(@model, descr, yml) #generate_index)
 
-    # cell = Gtk::CellRendererText.new
-    # cell.style = Pango::Style::NORMAL #ITALIC # OBLIQUE
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
     append_column(@model, tree_view, "Name", 200) do |cell, path_string, new_text, model|
-      false #cell_edited(cell, path_string, new_text, model)
+      false
     end      
 
-    append_column(@model, tree_view, "Rate", 30) do |cell, path_string, new_text, model|
-      # cell_edited(cell, path_string, new_text, model)
+    append_column(@model, tree_view, "Rate", 30) { |cell, path_string, new_text, model|
       path = Gtk::TreePath.new(path_string)
       iter = model.get_iter(path)
-      if new_text == '' || ISANUMBER.match(new_text)
+      if cell.text != new_text && (new_text == '' || ISANUMBER.match(new_text))
         iter.set_value(RATE_COLUMN, new_text)
-      else
-        return false
+        d = @descr[iter.get_value(0)] ||= {'rate' => '', 'genre' => '', 'descr' => ''}
+        d['rate'] = new_text.to_i
+        save_descr
       end
-      d = @descr[iter.get_value(0)] ||= {'rate' => '', 'genre' => '', 'descr' => ''}
-      d['rate'] = new_text.to_i
-      save_descr
-      completion_check_update(new_text)
-    end      
+    }
+
     append_column(@model, tree_view, "Genre") do |cell, path_string, new_text, model|
-      # cell_edited(cell, path_string, new_text, model)
       path = Gtk::TreePath.new(path_string)
 
-      iter = model.get_iter(path)
-      iter.set_value(GENRE_COLUMN, new_text)
-      d = @descr[iter.get_value(0)] ||= {'rate' => '', 'genre' => '', 'descr' => ''}
-      d['genre'] = new_text
-      save_descr
-    end      
+      if cell.text != new_text
+        iter = model.get_iter(path)
+        iter.set_value(GENRE_COLUMN, new_text)
+        d = @descr[iter.get_value(0)] ||= {'rate' => '', 'genre' => '', 'descr' => ''}
+        d['genre'] = new_text
+        save_descr
+        completion_check_update(new_text)
+      end
+    end
+
     append_column(@model, tree_view, "Description", 200) do |cell, path_string, new_text, model|
-      # cell_edited(cell, path_string, new_text, model)
       path = Gtk::TreePath.new(path_string)
-      iter = model.get_iter(path)
-      iter.set_value(DESCR_COLUMN, new_text)
-      d = @descr[iter.get_value(0)] ||= {'rate' => '', 'genre' => '', 'descr' => ''}
-      d['descr'] = new_text
-      save_descr
+      if cell.text != new_text
+        iter = model.get_iter(path)
+        iter.set_value(DESCR_COLUMN, new_text)
+        d = @descr[iter.get_value(0)] ||= {'rate' => '', 'genre' => '', 'descr' => ''}
+        d['descr'] = new_text
+        save_descr
+      end
     end      
-
-    # selection.signal_connect('changed') do |selection|
-    #   iter = selection.selected
-    #   # warn("--- #{iter.inspect}") if iter
-    #   # warn("--- #{iter.get_value(DESCR_COLUMN)}") if iter
-    # end
-    # tree_view.signal_connect('row_activated') do |tree_view, path, column|
-    #   # row_activated_cb(tree_view.model, path)
-    #   warn "> #{tree_view} / #{path} / #{column}"
-    # end
 
     style_provider = Gtk::CssProvider.new()
     css = <<_CSS
@@ -293,7 +306,14 @@ _CSS
     return tree_view
   end
 
-  def left_is_lower l, r
+  ##
+  ## @brief      Check if left path is lower than right path
+  ##
+  ## @param      l left path
+  ## @param      r right path
+  ## @return     true if left path is lower
+  ##
+  def left_is_lower(l, r)
     return false if l==r
     ar=r.split(':').map{|n| n.to_i}
 
@@ -371,7 +391,8 @@ _CSS
 
   def save_descr(path=nil)
     path = @descr_path if path.nil?
-    warn "SAVE: #{path}, #{@descr.to_yaml}"
+    # warn "SAVE: #{path}, #{@descr.to_yaml}"
+    File.rename(path,"#{path}.bak")
     File.open(path,'w'){ |f| f.write @descr.to_yaml }
   end
 
@@ -422,11 +443,8 @@ end
 
 def load_descr(path=nil)
   path = $descr_path if path.nil?
-  begin
-    YAML.safe_load(File.read(path))
-  rescue
-    {}
-  end
+  yaml = YAML.safe_load(File.read(path))
+  yaml || {}
 end
 
 # def build_tree( tree, model )
