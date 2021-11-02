@@ -1,0 +1,9 @@
+---
+Book1:
+  descr: good book
+  genre: fiction
+  rate: 5
+Book2:
+  rate: ''
+  genre: ''
+  descr: ''
