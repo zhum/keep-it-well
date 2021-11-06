@@ -30,6 +30,7 @@ class DisksView < Gtk::ApplicationWindow
       set_template resource: '/ru/sergzhum/keep-it-well/ui/application_window.ui'
       bind_template_child 'search'
       bind_template_child 'search_line'
+      bind_template_child 'changed'
       bind_template_child 'expand'
       bind_template_child 'collapse'
       bind_template_child 'quit'
@@ -59,6 +60,16 @@ class DisksView < Gtk::ApplicationWindow
       do_search(@model, search_line.text)
     end
 
+    search_line.signal_connect 'activate' do |button, application|
+      warn "activate"
+      do_search(@model, search_line.text)
+    end
+
+    # search_line.signal_connect 'changed' do |button, application|
+    #   warn "changed"
+    #   changed.text = '*'
+    # end
+
     expand.signal_connect 'clicked' do |button, application|
       tree_view.expand_all
     end
@@ -74,19 +85,6 @@ class DisksView < Gtk::ApplicationWindow
     quit.signal_connect 'clicked' do |button, application|
       close #Gtk.main_quit
     end
-
-    # signal_connect('destroy') do
-    #   Gtk.main_quit
-    # end
-
-    # signal_connect("key_press_event") do |widget, event|
-    #   if event.state.control_mask? and event.keyval == Gdk::Keyval::GDK_KEY_q
-    #     destroy
-    #     true
-    #   else
-    #     false
-    #   end
-    # end
 
     @completion = create_completion_model(descr, def_genres)
     create_tree(yaml,descr)
@@ -392,6 +390,7 @@ _CSS
     # warn "SAVE: #{path}, #{@descr.to_yaml}"
     File.rename(path,"#{path}.bak")
     File.open(path,'w'){ |f| f.write @descr.to_yaml }
+    changed.text = ''
   end
 
 end
