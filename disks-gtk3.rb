@@ -45,7 +45,7 @@ def load_yaml()#tree, model)
     Dir.glob("#{descr_dir}/*.yml").reject{|x| x == $descr_path}
   end
 
-  warn "DD=#{descr_dir}"
+  # warn "DD=#{descr_dir}"
   $descr = load_descr($descr_path)
 
   full=[]
@@ -82,7 +82,20 @@ end
 
 full = load_yaml
 
-main = Application.new(full, $descr, $descr_path)
+warn ARGV[0].downcase.gsub(/[^a-z0-9]/,'')
+def_genres = case ARGV[0].downcase.gsub(/[^a-z0-9]/,'')
+  when 'anime'
+    %w(Сёнен Махосёдзе Сёдзе Детектив Мистика Повседневность Другое)
+  when 'abooks', 'books'
+    %w(Фэнтези Детектив История Фантастика Научпоп Деловые Саморазвитие)
+  when 'music'
+    %w(Рок Кантри Русское 60-е Классика)
+  else
+    []
+  end
+
+ 
+main = Application.new(full, $descr, $descr_path, def_genres)
 # main.set_default_size(600, 400)
 # main.show_all
 

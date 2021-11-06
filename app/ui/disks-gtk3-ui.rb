@@ -6,11 +6,11 @@ require 'yaml'
 
 
 class Application < Gtk::Application
-  def initialize(yaml, descr, descr_path)
+  def initialize(yaml, descr, descr_path, def_genres=[])
     super 'ru.sergzhum.keep-it-well', Gio::ApplicationFlags::FLAGS_NONE
 
     signal_connect :activate do |application|
-      window = DisksView.new(application, yaml, descr, descr_path)
+      window = DisksView.new(application, yaml, descr, descr_path, def_genres)
       window.present
     end
   end
@@ -47,7 +47,7 @@ class DisksView < Gtk::ApplicationWindow
   ## @param      descr       description hash ('item' => {rate: n, genre: 'genre', 'descr': 'description'})
   ## @param      descr_path  path to the description file
   ##
-  def initialize(app, yaml, descr, descr_path)
+  def initialize(app, yaml, descr, descr_path, def_genres)
     super application: app
 
     @descr_path = descr_path
@@ -88,63 +88,8 @@ class DisksView < Gtk::ApplicationWindow
     #   end
     # end
 
-    @completion = create_completion_model(descr)
+    @completion = create_completion_model(descr, def_genres)
     create_tree(yaml,descr)
-
-    # if false
-    #   vbox = Gtk::Box.new(:vertical)
-    #   add(vbox)
-
-    #   tree = create_tree(yaml,descr)
-    #   scrolled_window = Gtk::ScrolledWindow.new
-    #   scrolled_window.set_policy :automatic, :automatic
-    #   scrolled_window.add(tree)
-    #   vbox.pack_start(scrolled_window, :expand => true, :fill => true, :padding => 0)
-
-    #   # buttons = Gtk::Box.new(:horizontal) 
-    #   # vbox.pack_start(buttons, expand: true, fill: true, padding: 2 )
-    #   frame = Gtk::Frame.new( "Actions" )
-    #   vbox.pack_start(frame, expand: false, fill: true, padding: 0)
-    #   vbox2 = Gtk::Box.new( :vertical )
-    #   frame.add( vbox2 )
-    #   # vbox2.pack_start( frame, false, false, 0 )
-
-    #   hbox = Gtk::Box.new( :horizontal )
-    #   text = Gtk::Entry.new
-    #   text.signal_connect("activate"){ do_search(tree, @model, text.text)}
-    #   hbox.pack_start( text,  :expand => true, :fill => true, :padding => 0 )
-    #   search_button = Gtk::Button.new(label: "Search")
-    #   search_button.signal_connect("clicked"){ do_search(tree, @model, text.text) }
-    #   hbox.pack_start( search_button,  :expand => true, :fill => true, :padding => 0 )
-    #   vbox2.pack_start( hbox,  :expand => true, :fill => true, :padding => 0 )
-
-    #   ## 1st row
-    #   hbox = Gtk::Box.new(:horizontal)
-    #   button = Gtk::Button.new(label:  "Expand all" )
-    #   button.signal_connect( "clicked" ) { tree.expand_all }
-    #   hbox.pack_start( button,  :expand => true, :fill => true, :padding => 0 )
-
-    #   button = Gtk::Button.new(label:  "Collapse all" )
-    #   button.signal_connect( "clicked" ) { tree.collapse_all }
-    #   hbox.pack_start( button,  :expand => true, :fill => true, :padding => 0 )
-    #   vbox2.pack_start( hbox,  :expand => true, :fill => true, :padding => 0 )
-
-    #   ## 4th row
-    #   hbox = Gtk::Box.new( :horizontal )
-    #   button = Gtk::Button.new(label:  "Get Data" )
-    #   button.signal_connect( "clicked" ) {get_data(tree, @model)}
-    #   hbox.pack_start( button,  :expand => true, :fill => true, :padding => 0 )
-
-    #   button = Gtk::Button.new(label:  "Quit" )
-    #   button.signal_connect( "clicked" ) {Gtk.main_quit}
-    #   hbox.pack_start( button,  :expand => true, :fill => true, :padding => 0 )
-    #   vbox2.pack_start( hbox,  :expand => true, :fill => true, :padding => 0 )
-
-    #   hbox = Gtk::Box.new( :horizontal )
-    #   @label = Gtk::Label.new("")
-    #   hbox.pack_start( @label,  :expand => true, :fill => true, :padding => 0 )
-    #   vbox2.pack_start( hbox,  :expand => true, :fill => true, :padding => 0 )
-    # end
   end
 
   ##
@@ -179,12 +124,12 @@ class DisksView < Gtk::ApplicationWindow
   ##
   ## @param      descr  The descriptions hash
   ##
-  def create_completion_model(descr)
+  def create_completion_model(descr, def_genres=[])
     store = Gtk::ListStore.new(String)
 
     # arr = extract_genres(descr)
     arr = descr.values.map { |e| e['genre'] }
-    .concat %w(Фэнтези Детектив История Фантастика Научпоп Деловые Саморазвитие)
+    .concat(def_genres)
     .flatten
     arr.reject! { |e| e.nil? }
     arr.reject! { |e| e.empty? }
@@ -339,10 +284,10 @@ class DisksView < Gtk::ApplicationWindow
 
     style_provider = Gtk::CssProvider.new()
     css = <<_CSS
-GtkTreeView row:nth-child(even) {
+GtkTreeStore row:nth-child(even) {
     background-color: #FF00FF;
 }
-GtkTreeView row:nth-child(odd) {
+GtkTreeStore row:nth-child(odd) {
     background-color: #00FFFF;
 }
 _CSS
