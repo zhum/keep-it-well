@@ -83,18 +83,29 @@ end
 full = load_yaml
 
 warn ARGV[0].downcase.gsub(/[^a-z0-9]/,'')
-def_genres = case ARGV[0].downcase.gsub(/[^a-z0-9]/,'')
-  when 'anime'
-    %w(Сёнен Махосёдзе Сёдзе Детектив Мистика Повседневность Другое)
-  when 'abooks', 'books'
-    %w(Фэнтези Детектив История Фантастика Научпоп Деловые Саморазвитие)
-  when 'music'
-    %w(Рок Кантри Русское 60-е Классика)
-  else
-    []
-  end
+RU_GENRES={
+  'anime' => %w(Сёнен Махосёдзе Приключение Детектив Мистика Повседневность Другое),
+  'abooks' => %w(Фэнтези Детектив История Фантастика Научпоп Деловые Саморазвитие),
+  'books' => %w(Фэнтези Детектив История Фантастика Научпоп Деловые Саморазвитие),
+  'music' => %w(Рок Кантри Русское 60-е Классика)
+}
+EN_GENRES={
+  'anime' => %w(Shonen Mohoshoudjo Amdventure Detective Mystery Slice-of-life Other),
+  'abooks' => %w(Fantasy Detective History Science-fiction Science Business Self-development),
+  'books' => %w(Fantasy Detective History Science-fiction Science Business Self-development),
+  'music' => %w(Rock Country Pop 60-s Classics)
+}
 
- 
+theme = ARGV[0].downcase.gsub(/[^a-z0-9]/,'')
+lang = ENV['LANGUAGE'] || ENV['LANG'].to_s[0..1]
+def_genres = if lang=='en'
+  EN_GENRES[lang] || []
+elsif lang=='ru'
+  RU_GENRES[lang] || []
+else
+  []
+end
+
 main = Application.new(full, $descr, $descr_path, def_genres)
 # main.set_default_size(600, 400)
 # main.show_all
